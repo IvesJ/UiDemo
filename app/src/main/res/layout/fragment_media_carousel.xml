@@ -55,7 +55,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@android:drawable/ic_media_pause"
             android:contentDescription="暂停/播放"
-            android:tint="#FFFFFFFF" />
+            app:tint="#FFFFFFFF" />
 
     </LinearLayout>
 

@@ -62,8 +62,14 @@ class VideoViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         try {
             release()
 
+            val videoSource = if (video.isLocal && video.localPath != null) {
+                video.localPath  // 本地文件路径
+            } else {
+                video.videoUrl  // 远程URL
+            }
+
             mediaPlayer = MediaPlayer().apply {
-                setDataSource(video.videoUrl)
+                setDataSource(videoSource)
                 setSurface(Surface(surface))
 
                 setOnPreparedListener { mp ->

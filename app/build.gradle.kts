@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    kotlin("kapt")
 }
 
 android {
@@ -60,6 +61,23 @@ dependencies {
 
     // Lifecycle for lifecycleScope
     implementation(libs.androidx.lifecycle.runtime.ktx)
+
+    // 网络库
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging.interceptor)
+    implementation(libs.gson)
+
+    // 数据库
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    kapt(libs.room.compiler)
+
+    // LiveData & ViewModel
+    implementation(libs.lifecycle.livedata.ktx)
+    implementation(libs.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.activity.ktx)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

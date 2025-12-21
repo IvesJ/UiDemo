@@ -1,6 +1,7 @@
 package com.ace.uidemo.fragment
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,6 +18,19 @@ import kotlinx.coroutines.launch
 
 class MediaCarouselFragment : Fragment() {
 
+    companion object {
+        private const val TAG = "MediaCarouselFragment"
+        private const val ARG_MEDIA_ITEMS = "media_items"
+
+        fun newInstance(mediaItems: ArrayList<MediaItem>): MediaCarouselFragment {
+            val fragment = MediaCarouselFragment()
+            val args = Bundle()
+            args.putSerializable(ARG_MEDIA_ITEMS, mediaItems)
+            fragment.arguments = args
+            return fragment
+        }
+    }
+
     private var _binding: FragmentMediaCarouselBinding? = null
     private val binding get() = _binding!!
 
@@ -28,20 +42,8 @@ class MediaCarouselFragment : Fragment() {
 
     private var mediaItems: List<MediaItem> = emptyList()
     private var onCarouselCompleted: (() -> Unit)? = null
-    private var onReachedEnd: (() -> Unit)? = null  // 新增：滑动到最后一页的回调
-    private var onReachedStart: (() -> Unit)? = null  // 新增：滑动到第一页的回调
-
-    companion object {
-        private const val ARG_MEDIA_ITEMS = "media_items"
-
-        fun newInstance(mediaItems: ArrayList<MediaItem>): MediaCarouselFragment {
-            val fragment = MediaCarouselFragment()
-            val args = Bundle()
-            args.putSerializable(ARG_MEDIA_ITEMS, mediaItems)
-            fragment.arguments = args
-            return fragment
-        }
-    }
+    private var onReachedEnd: (() -> Unit)? = null  // 滑动到最后一页并继续向左滑的回调
+    private var onReachedStart: (() -> Unit)? = null  // 滑动到第一页并继续向右滑的回调
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -150,10 +152,17 @@ class MediaCarouselFragment : Fragment() {
     }
 
     private val pageChangeCallback = object : ViewPager2.OnPageChangeCallback() {
+        private var previousPosition = -1
+        private var previousPositionOffset = 0f
+        private var isUserDragging = false  // 标记用户是否正在拖拽
+
         override fun onPageSelected(position: Int) {
             super.onPageSelected(position)
 
+            Log.d(TAG, "onPageSelected: position=$position, currentScrollPosition=$currentScrollPosition")
+
             if (position == currentScrollPosition) {
+                Log.d(TAG, "位置未变化，跳过")
                 return
             }
 
@@ -176,17 +185,93 @@ class MediaCarouselFragment : Fragment() {
                 is MediaItem.Video -> {
                     if (item.duration > 0) {
                         startAutoScroll(position)
+                    } else {
+                        Log.d(TAG, "视频duration尚未准备好，等待onVideoReady")
                     }
+                    // 如果duration还没准备好，等待onVideoReady回调
                 }
             }
+        }
+
+        override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
+            super.onPageScrolled(position, positionOffset, positionOffsetPixels)
+
+            // 只在用户手动拖拽时检测边界滑动
+            if (!isUserDragging) {
+                previousPositionOffset = positionOffset
+                return
+            }
+
+            // 添加调试日志
+            if (position == mediaItems.size - 1 || position == 0) {
+                Log.d(TAG, "onPageScrolled: position=$position, offset=$positionOffset, prevOffset=$previousPositionOffset, pixels=$positionOffsetPixels")
+            }
+
+            // 检测边界滑动
+            if (position == mediaItems.size - 1) {
+                // 在最后一页，检测向左滑动
+                if (positionOffset == 0f && previousPositionOffset == 0f && positionOffsetPixels < 0) {
+                    Log.d(TAG, "检测到在最后一页尝试向左滑动")
+                    isUserDragging = false  // 重置标记
+                    onReachedEnd?.invoke()
+                }
+            } else if (position == 0) {
+                // 在第一页，检测向右滑动
+                if (positionOffset == 0f && previousPositionOffset == 0f && positionOffsetPixels > 0) {
+                    Log.d(TAG, "检测到在第一页尝试向右滑动")
+                    isUserDragging = false  // 重置标记
+                    onReachedStart?.invoke()
+                }
+            }
+
+            previousPosition = position
+            previousPositionOffset = positionOffset
         }
 
         override fun onPageScrollStateChanged(state: Int) {
             super.onPageScrollStateChanged(state)
 
+            val stateName = when (state) {
+                ViewPager2.SCROLL_STATE_IDLE -> "IDLE"
+                ViewPager2.SCROLL_STATE_DRAGGING -> "DRAGGING"
+                ViewPager2.SCROLL_STATE_SETTLING -> "SETTLING"
+                else -> "UNKNOWN"
+            }
+            Log.d(TAG, "onPageScrollStateChanged: state=$stateName")
+
             if (state == ViewPager2.SCROLL_STATE_DRAGGING) {
+                isUserDragging = true
                 autoScrollJob?.cancel()
-                currentScrollPosition = -1
+                // 不要设置为-1，保持当前position，以便后续正确处理
+            } else if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                isUserDragging = false
+                // 滑动停止后，确保自动滚动正常运行
+                val actualPosition = binding.viewPager.currentItem
+                Log.d(TAG, "滑动停止: actualPosition=$actualPosition, currentScrollPosition=$currentScrollPosition")
+
+                if (actualPosition != currentScrollPosition) {
+                    Log.d(TAG, "位置不一致，重新同步并启动自动滚动")
+                    currentScrollPosition = actualPosition
+                }
+
+                // 无论位置是否改变，都要确保自动滚动正在运行
+                // 因为在DRAGGING时已经取消了autoScrollJob
+                if (!isPaused && (autoScrollJob == null || !autoScrollJob!!.isActive)) {
+                    Log.d(TAG, "自动滚动未运行，重新启动")
+                    val item = mediaItems[actualPosition]
+                    when (item) {
+                        is MediaItem.Image -> {
+                            startAutoScroll(actualPosition)
+                        }
+                        is MediaItem.Video -> {
+                            if (item.duration > 0) {
+                                startAutoScroll(actualPosition)
+                            } else {
+                                Log.d(TAG, "视频duration尚未准备好，等待onVideoReady")
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -201,7 +286,10 @@ class MediaCarouselFragment : Fragment() {
             is MediaItem.Video -> mediaItem.duration
         }
 
+        Log.d(TAG, "startAutoScroll: position=$position, mediaType=${mediaItem::class.simpleName}, duration=$duration")
+
         if (duration <= 0) {
+            Log.w(TAG, "duration <= 0，不启动自动滚动")
             return
         }
 
@@ -215,6 +303,7 @@ class MediaCarouselFragment : Fragment() {
                 binding.indicatorView.updateProgress(position, progress.toInt())
 
                 if (elapsed >= duration) {
+                    Log.d(TAG, "自动滚动完成: position=$position")
                     moveToNext(position)
                     break
                 }
@@ -261,12 +350,16 @@ class MediaCarouselFragment : Fragment() {
     }
 
     private fun moveToNext(currentPosition: Int) {
+        Log.d(TAG, "moveToNext called: currentPosition=$currentPosition, totalItems=${mediaItems.size}")
         if (currentPosition >= mediaItems.size - 1) {
             // 当前Tab轮播结束，通知父Activity
+            Log.d(TAG, "轮播完成，触发onCarouselCompleted回调")
             onCarouselCompleted?.invoke()
         } else {
             val nextPosition = currentPosition + 1
-            currentScrollPosition = -1
+            Log.d(TAG, "切换到下一页: $nextPosition")
+            // 不要在这里设置currentScrollPosition，让onPageSelected回调来设置
+            // 这样可以确保onPageSelected中的逻辑正常执行
             binding.viewPager.setCurrentItem(nextPosition, true)
         }
     }
@@ -280,8 +373,14 @@ class MediaCarouselFragment : Fragment() {
     }
 
     private fun onVideoCompleted(position: Int) {
-        if (position == currentScrollPosition) {
+        // 确保只有当前显示的视频完成时才触发
+        val currentItem = binding.viewPager.currentItem
+        Log.d(TAG, "onVideoCompleted: position=$position, currentItem=$currentItem, currentScrollPosition=$currentScrollPosition")
+        if (position == currentItem) {
+            Log.d(TAG, "视频播放完成，触发moveToNext")
             moveToNext(position)
+        } else {
+            Log.d(TAG, "视频位置不匹配，忽略完成事件")
         }
     }
 
