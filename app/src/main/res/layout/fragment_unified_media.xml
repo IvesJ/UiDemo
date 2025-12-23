@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- 外层ViewPager2 - 用于Tab切换 - 全屏显示 -->
+    <com.ace.uidemo.widget.NestedScrollableHost
+        android:id="@+id/nestedHost"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/tabViewPager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </com.ace.uidemo.widget.NestedScrollableHost>
+
+    <!-- 顶部栏 - 浮动在内容上方 -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp">
+
+        <!-- 返回按钮 -->
+        <TextView
+            android:id="@+id/backButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="8dp"
+            android:text="&lt; 售价"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
+
+        <!-- Tab标签页容器 - 带背景的圆角矩形 -->
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabLayout"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_weight="1"
+            android:layout_gravity="center"
+            android:background="@drawable/tab_background"
+            app:tabBackground="@drawable/tab_item_selector"
+            app:tabGravity="fill"
+            app:tabIndicator="@drawable/empty_indicator"
+            app:tabIndicatorHeight="0dp"
+            app:tabMinWidth="70dp"
+            app:tabMode="fixed"
+            app:tabPaddingBottom="0dp"
+            app:tabPaddingEnd="16dp"
+            app:tabPaddingStart="16dp"
+            app:tabPaddingTop="0dp"
+            app:tabRippleColor="@null"
+            app:tabTextAppearance="@style/TabTextAppearance"
+            app:tabTextColor="@color/tab_text_color" />
+
+        <!-- 右侧下载按钮 -->
+        <ImageButton
+            android:id="@+id/downloadButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="下载"
+            android:scaleType="centerInside"
+            android:src="@android:drawable/stat_sys_download"
+            android:tint="#FFFFFF" />
+    </LinearLayout>
+
+    <!-- 底部控制栏 - 浮动在内容上方 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/controlsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="16dp">
+
+        <!-- 暂停/播放按钮（左侧） -->
+        <ImageButton
+            android:id="@+id/pauseButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="暂停/播放"
+            android:scaleType="fitCenter"
+            android:src="@android:drawable/ic_media_pause"
+            android:tint="#FFFFFF"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- 可点击按钮（根据图片是否可点击显示，右侧） -->
+        <Button
+            android:id="@+id/clickableButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:backgroundTint="#4CAF50"
+            android:minWidth="100dp"
+            android:paddingHorizontal="20dp"
+            android:text="查看详情"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:visibility="visible" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</FrameLayout>

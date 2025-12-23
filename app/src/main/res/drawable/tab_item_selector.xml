@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tab项选择器 - 选中时白色圆角背景带灰色圆环，未选中时透明 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <layer-list>
+            <!-- 外层圆环 -->
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <corners android:radius="16dp" />
+                </shape>
+            </item>
+            <!-- 内层白色背景，带2dp间距形成圆环效果 -->
+            <item
+                android:left="4dp"
+                android:right="4dp"
+                android:top="4dp"
+                android:bottom="4dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="#FFFFFF" />
+                    <corners android:radius="14dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+</selector>

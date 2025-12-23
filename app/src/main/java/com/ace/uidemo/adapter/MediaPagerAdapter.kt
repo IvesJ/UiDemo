@@ -76,4 +76,25 @@ class MediaPagerAdapter(
         videoHolders.values.forEach { it.release() }
         videoHolders.clear()
     }
+
+    /**
+     * 暂停所有视频
+     */
+    fun pauseAllVideos() {
+        videoHolders.values.forEach { it.pause() }
+    }
+
+    /**
+     * 恢复指定位置的视频
+     */
+    fun resumeVideo(position: Int) {
+        videoHolders[position]?.resume()
+    }
+
+    /**
+     * 重置所有视频到开始位置
+     */
+    fun resetAllVideos() {
+        videoHolders.values.forEach { it.reset() }
+    }
 }

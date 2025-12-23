@@ -34,12 +34,25 @@ class MediaIndicatorView @JvmOverloads constructor(
             val progressBar = indicatorView.findViewById<ProgressBar>(R.id.progressBar)
 
             indicators.add(IndicatorItem(indicatorView, dotView, progressBar))
+
+            // 添加间距
+            val params = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+            if (i > 0) {
+                params.leftMargin = dpToPx(4) // 4dp间距
+            }
+            indicatorView.layoutParams = params
+
             addView(indicatorView)
         }
     }
 
     fun setCurrentPosition(position: Int) {
-        if (position < 0 || position >= indicators.size) return
+        if (position < 0 || position >= indicators.size) {
+            android.util.Log.d("MediaIndicatorView", "setCurrentPosition: invalid position=$position, size=${indicators.size}")
+            return
+        }
+
+        android.util.Log.d("MediaIndicatorView", "setCurrentPosition: from $currentPosition to $position")
 
         // Hide progress bar and show dot for previous position
         if (currentPosition >= 0 && currentPosition < indicators.size) {
@@ -61,16 +74,35 @@ class MediaIndicatorView @JvmOverloads constructor(
 
     fun updateProgress(position: Int, progress: Int) {
         if (position >= 0 && position < indicators.size) {
+            android.util.Log.d("MediaIndicatorView", "updateProgress: position=$position, progress=$progress")
             indicators[position].progressBar.progress = progress.coerceIn(0, 100)
         }
     }
 
+    /**
+     * 获取当前指示器的View（用于滚动定位）
+     */
     fun getCurrentIndicatorView(): View? {
         return if (currentPosition >= 0 && currentPosition < indicators.size) {
             indicators[currentPosition].containerView
         } else {
             null
         }
+    }
+
+    /**
+     * 获取指定位置的当前进度
+     */
+    fun getCurrentProgress(position: Int): Int {
+        return if (position >= 0 && position < indicators.size) {
+            indicators[position].progressBar.progress
+        } else {
+            0
+        }
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return (dp * resources.displayMetrics.density).toInt()
     }
 
     private data class IndicatorItem(

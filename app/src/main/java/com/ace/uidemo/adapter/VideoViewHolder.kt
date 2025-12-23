@@ -18,6 +18,7 @@ class VideoViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
     private val loadingIndicator: ProgressBar = itemView.findViewById(R.id.loadingIndicator)
     private var mediaPlayer: MediaPlayer? = null
     private var currentVideo: MediaItem.Video? = null
+    private var isPrepared = false // 标记视频是否已准备好
 
     fun bind(
         video: MediaItem.Video,
@@ -73,13 +74,14 @@ class VideoViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
                 setSurface(Surface(surface))
 
                 setOnPreparedListener { mp ->
+                    isPrepared = true
                     loadingIndicator.visibility = View.GONE
                     val duration = mp.duration.toLong()
                     video.duration = duration
                     if (adapterPosition != RecyclerView.NO_POSITION) {
                         onVideoReady(adapterPosition, duration)
                     }
-                    mp.start()
+                    // 不自动播放，等待外部调用resume()
                 }
 
                 setOnCompletionListener {
@@ -107,14 +109,44 @@ class VideoViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
     }
 
     fun pause() {
-        mediaPlayer?.pause()
+        try {
+            mediaPlayer?.let {
+                if (it.isPlaying) {
+                    it.pause()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun resume() {
-        mediaPlayer?.start()
+        try {
+            mediaPlayer?.let {
+                if (isPrepared && !it.isPlaying) {
+                    it.start()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun reset() {
+        try {
+            mediaPlayer?.let {
+                it.seekTo(0)
+                if (it.isPlaying) {
+                    it.pause()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun release() {
+        isPrepared = false
         mediaPlayer?.release()
         mediaPlayer = null
     }

@@ -33,29 +33,15 @@
             android:layout_marginTop="16dp" />
     </LinearLayout>
 
-    <!-- 内容视图 -->
-    <LinearLayout
-        android:id="@+id/contentLayout"
+    <!-- 内容视图 - Fragment容器 -->
+    <FrameLayout
+        android:id="@+id/fragmentContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <com.google.android.material.tabs.TabLayout
-            android:id="@+id/tabLayout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@android:color/black"
-            app:tabTextColor="#80FFFFFF"
-            app:tabSelectedTextColor="#FFFFFFFF"
-            app:tabIndicatorColor="#FFFFFFFF"
-            app:tabMode="scrollable" />
-
-        <androidx.viewpager2.widget.ViewPager2
-            android:id="@+id/tabViewPager"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-    </LinearLayout>
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
