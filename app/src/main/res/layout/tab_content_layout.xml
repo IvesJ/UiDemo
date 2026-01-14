@@ -1,43 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 单个Tab的内容布局，包含媒体轮播ViewPager2和指示器 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 单个Tab的内容布局，包含左侧子Tab列表和媒体轮播ViewPager2 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="#000000"
+    android:orientation="horizontal">
 
-    <!-- 媒体内容ViewPager2（内层） -->
-    <com.ace.uidemo.widget.NestedScrollableHost
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
+    <!-- 左侧子Tab列表（竖向RecyclerView） - 仅当有子Tab时显示 -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/subTabRecyclerView"
+        android:layout_width="80dp"
+        android:layout_height="match_parent"
+        android:background="#20000000"
+        android:visibility="gone"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-        <androidx.viewpager2.widget.ViewPager2
-            android:id="@+id/mediaViewPager"
+    <!-- 右侧内容区域 -->
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1">
+
+        <!-- 媒体内容ViewPager2（内层） -->
+        <com.ace.uidemo.widget.NestedScrollableHost
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-    </com.ace.uidemo.widget.NestedScrollableHost>
+            android:layout_height="match_parent">
 
-    <!-- 底部指示器（独立于每个Tab） -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/indicatorContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="16dp">
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/mediaViewPager"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </com.ace.uidemo.widget.NestedScrollableHost>
 
-        <!-- 指示器居中显示 -->
-        <com.ace.uidemo.widget.MediaIndicatorView
-            android:id="@+id/indicatorView"
-            android:layout_width="wrap_content"
+        <!-- 底部指示器（独立于每个Tab） -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/indicatorContainer"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/indicator_background"
+            android:layout_gravity="bottom"
             android:paddingHorizontal="16dp"
-            android:paddingVertical="8dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-    </androidx.constraintlayout.widget.ConstraintLayout>
+            android:paddingVertical="16dp">
 
-</FrameLayout>
+            <!-- 指示器居中显示 -->
+            <com.ace.uidemo.widget.MediaIndicatorView
+                android:id="@+id/indicatorView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/indicator_background"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="8dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </FrameLayout>
+
+</LinearLayout>

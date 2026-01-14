@@ -95,28 +95,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 处理收到的配置数据
      */
     private fun onConfigReceived(configs: List<CloudConfig>) {
-        Log.d(TAG, "========== 处理配置数据 ==========")
-
         // 根据配置创建所有Tabs（但先不显示）
         val tabs = configs.map { config ->
-            TabData(
-                id = config.tabTitle,
-                title = config.tabTitle,
-                mediaItems = config.filesInfo.map { fileInfo ->
-                    createMediaItemFromFileInfo(fileInfo)
-                }
-            )
+            createTabDataFromConfig(config)
         }
 
         _allTabs.value = tabs
 
         Log.d(TAG, "创建了 ${tabs.size} 个Tab配置:")
         tabs.forEach { tab ->
-            Log.d(TAG, "  - ${tab.title}: ${tab.mediaItems.size} 个文件")
+            val totalFiles = tab.mediaItems.size + tab.subTabs.sumOf { it.mediaItems.size }
+            Log.d(TAG, "  - ${tab.title}: ${tab.mediaItems.size} 个主文件, ${tab.subTabs.size} 个子Tab (共 $totalFiles 个文件)")
         }
 
         // 检查是否有已经完全下载好的Tab
         checkAndShowCompletedTabs()
+    }
+
+    /**
+     * 从CloudConfig创建TabData（递归处理子Tab）
+     */
+    private fun createTabDataFromConfig(config: CloudConfig): TabData {
+        return TabData(
+            id = config.tabTitle,
+            title = config.tabTitle,
+            mediaItems = config.filesInfo.map { fileInfo ->
+                createMediaItemFromFileInfo(fileInfo)
+            },
+            subTabs = config.subTabs.map { subConfig ->
+                createTabDataFromConfig(subConfig)
+            }
+        )
     }
 
     /**
@@ -155,10 +164,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 监听下载进度
      */
     private fun observeDownloadProgress() {
-        Log.d(TAG, "开始收集下载进度Flow")
         viewModelScope.launch {
             repository.observeProgress()?.collect { progressMap ->
-                Log.d(TAG, "收到进度更新: ${progressMap.size} 个文件")
                 updateDownloadStates(progressMap)
                 // 每次进度更新都检查是否有新的Tab完成
                 checkAndShowCompletedTabs()
@@ -171,37 +178,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun updateDownloadStates(progressMap: Map<String, DownloadProgress>) {
         val grouped = progressMap.values.groupBy { it.tabId }
-        Log.d(TAG, "========== 更新下载状态 ==========")
-        Log.d(TAG, "进度Map大小: ${progressMap.size}")
-        Log.d(TAG, "分组后的Tab: ${grouped.keys.joinToString()}")
-
-        // 打印每个Tab的详细进度
-        grouped.forEach { (tabId, progresses) ->
-            Log.d(TAG, "[$tabId] 文件数: ${progresses.size}")
-            progresses.forEach { p ->
-                Log.d(TAG, "  - ${p.fileName}: ${p.state}")
-            }
-        }
 
         val newStates = mutableMapOf<String, TabDownloadState>()
 
         // 更新allTabs的下载状态（用于判断哪些Tab已完成）
         _allTabs.value.forEach { tabData ->
             val tabProgress = grouped[tabData.title] ?: emptyList()
-            Log.d(TAG, "[${tabData.title}] 匹配到 ${tabProgress.size} 个文件")
 
             val newState = when {
                 tabProgress.isEmpty() -> {
-                    Log.d(TAG, "[${tabData.title}] 状态: 未开始（无进度数据）")
                     TabDownloadState.NotStarted
                 }
                 tabProgress.all { it.isCompleted } -> {
-                    Log.d(TAG, "[${tabData.title}] 状态: 全部完成")
                     TabDownloadState.Completed
                 }
                 tabProgress.any { it.isFailed } -> {
                     val error = tabProgress.first { it.isFailed }.state as DownloadState.Failed
-                    Log.d(TAG, "[${tabData.title}] 状态: 失败 - ${error.error}")
                     // 触发显示重试对话框
                     _showRetryDialog.value = tabData.title
                     TabDownloadState.Failed(error.error)
@@ -216,9 +208,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                     val averageProgress = totalProgress / tabProgress.size
-
-                    val completedFiles = tabProgress.count { it.isCompleted }
-                    Log.d(TAG, "[${tabData.title}] 状态: 下载中 $completedFiles/${tabProgress.size} (综合进度: $averageProgress%)")
                     TabDownloadState.Downloading(averageProgress)
                 }
             }
@@ -226,76 +215,128 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             newStates[tabData.title] = newState
             val oldState = _tabDownloadStates.value[tabData.title]
             if (oldState != newState) {
-                Log.d(TAG, "[${tabData.title}] ★ 状态变化: $oldState -> $newState")
+                Log.d(TAG, "[${tabData.title}] 状态变化: $oldState -> $newState")
             }
         }
 
         _tabDownloadStates.value = newStates
-        Log.d(TAG, "================================")
     }
 
     /**
      * 检查并显示已完成的Tab
+     * 直接显示所有Tab（不等待下载完成），用于测试轮播效果
      */
     private fun checkAndShowCompletedTabs() {
-        Log.d(TAG, "========== 检查已完成的Tab ==========")
+        // 直接显示所有Tab（使用URL作为本地路径）
+        val allTabsWithPaths = _allTabs.value.map { tabData ->
+            createTabDataWithPaths(tabData, useLocalPath = false)
+        }
 
-        // 找出所有文件都已下载完成的Tab
-        val newCompletedTabs = _allTabs.value.filter { tabData ->
-            val allFilesExist = tabData.mediaItems.all { mediaItem ->
-                val fileName = when (mediaItem) {
-                    is MediaItem.Image -> mediaItem.id
-                    is MediaItem.Video -> mediaItem.id
-                }
-                val localFile = File(getApplication<Application>().filesDir, "media/$fileName")
-                localFile.exists()
+        if (allTabsWithPaths.isNotEmpty() && allTabsWithPaths != _completedTabs.value) {
+            _completedTabs.value = allTabsWithPaths
+            Log.d(TAG, "显示所有Tab: ${allTabsWithPaths.size}")
+
+            if (!hasShownContent) {
+                _showContent.value = true
+                hasShownContent = true
             }
+        }
+    }
 
-            if (allFilesExist) {
-                Log.d(TAG, "  ✓ [${tabData.title}] 所有文件已下载完成")
+    /**
+     * 创建带路径的TabData
+     */
+    private fun createTabDataWithPaths(tabData: TabData, useLocalPath: Boolean): TabData {
+        val mediaItems = tabData.mediaItems.map { mediaItem ->
+            val path = if (useLocalPath) {
+                File(getApplication<Application>().filesDir, "media/${mediaItem.id}").absolutePath
             } else {
-                Log.d(TAG, "  ✗ [${tabData.title}] 仍有文件未下载")
-            }
-
-            allFilesExist
-        }
-
-        // 更新已完成Tab列表
-        val completedTabsWithLocalPaths = newCompletedTabs.map { tabData ->
-            // 重新创建MediaItems，确保使用本地路径
-            TabData(
-                id = tabData.id,
-                title = tabData.title,
-                mediaItems = tabData.mediaItems.map { mediaItem ->
-                    val fileName = mediaItem.id
-                    val localPath = File(getApplication<Application>().filesDir, "media/$fileName").absolutePath
-
-                    when (mediaItem) {
-                        is MediaItem.Image -> MediaItem.Image(
-                            id = mediaItem.id,
-                            imageUrl = mediaItem.imageUrl,
-                            localPath = localPath
-                        )
-                        is MediaItem.Video -> MediaItem.Video(
-                            id = mediaItem.id,
-                            videoUrl = mediaItem.videoUrl,
-                            duration = mediaItem.duration,
-                            localPath = localPath
-                        )
-                    }
+                // 使用远程URL
+                when (mediaItem) {
+                    is MediaItem.Image -> mediaItem.imageUrl
+                    is MediaItem.Video -> mediaItem.videoUrl
                 }
-            )
+            }
+            when (mediaItem) {
+                is MediaItem.Image -> MediaItem.Image(
+                    id = mediaItem.id,
+                    imageUrl = mediaItem.imageUrl,
+                    localPath = path
+                )
+                is MediaItem.Video -> MediaItem.Video(
+                    id = mediaItem.id,
+                    videoUrl = mediaItem.videoUrl,
+                    duration = mediaItem.duration,
+                    localPath = path
+                )
+            }
         }
 
-        _completedTabs.value = completedTabsWithLocalPaths
-        Log.d(TAG, "已完成Tab数量: ${completedTabsWithLocalPaths.size}")
+        return TabData(
+            id = tabData.id,
+            title = tabData.title,
+            mediaItems = mediaItems,
+            subTabs = tabData.subTabs.map { subTab ->
+                createTabDataWithPaths(subTab, useLocalPath)
+            }
+        )
+    }
 
-        // 如果有至少一个Tab完成，且还未显示内容，则显示内容
-        if (completedTabsWithLocalPaths.isNotEmpty() && !hasShownContent) {
-            Log.d(TAG, "首次有Tab完成，显示内容")
-            _showContent.value = true
-            hasShownContent = true
+    /**
+     * 检查Tab的所有文件是否都存在
+     */
+    private fun checkTabFilesExist(tabData: TabData): Boolean {
+        // 检查主媒体文件
+        val mainFilesExist = tabData.mediaItems.all { mediaItem ->
+            val fileName = when (mediaItem) {
+                is MediaItem.Image -> mediaItem.id
+                is MediaItem.Video -> mediaItem.id
+            }
+            val localFile = File(getApplication<Application>().filesDir, "media/$fileName")
+            localFile.exists()
         }
+
+        if (!mainFilesExist) {
+            return false
+        }
+
+        // 递归检查子Tab
+        val subTabsExist = tabData.subTabs.all { subTab ->
+            checkTabFilesExist(subTab)
+        }
+
+        return mainFilesExist && subTabsExist
+    }
+
+    /**
+     * 创建已完成的TabData（递归处理子Tab和本地路径）
+     */
+    private fun createCompletedTabData(tabData: TabData): TabData {
+        return TabData(
+            id = tabData.id,
+            title = tabData.title,
+            mediaItems = tabData.mediaItems.map { mediaItem ->
+                val fileName = mediaItem.id
+                val localPath = File(getApplication<Application>().filesDir, "media/$fileName").absolutePath
+
+                when (mediaItem) {
+                    is MediaItem.Image -> MediaItem.Image(
+                        id = mediaItem.id,
+                        imageUrl = mediaItem.imageUrl,
+                        localPath = localPath
+                    )
+                    is MediaItem.Video -> MediaItem.Video(
+                        id = mediaItem.id,
+                        videoUrl = mediaItem.videoUrl,
+                        duration = mediaItem.duration,
+                        localPath = localPath
+                    )
+                }
+            },
+            subTabs = tabData.subTabs.map { subTab ->
+                createCompletedTabData(subTab)
+            }
+        )
     }
 
     /**

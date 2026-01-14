@@ -7,4 +7,10 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- 子Tab文字颜色 -->
+    <color name="sub_tab_text_color">#FFFFFF</color>
+    <color name="sub_tab_text_color_unselected">#80FFFFFF</color>
+    <color name="sub_tab_background_selected">#40FFFFFF</color>
+    <color name="sub_tab_background">#00000000</color>
 </resources>

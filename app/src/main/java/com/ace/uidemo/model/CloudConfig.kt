@@ -7,7 +7,10 @@ data class CloudConfig(
     val tabTitle: String,
 
     @SerializedName("filesInfo")
-    val filesInfo: List<FileInfo>
+    val filesInfo: List<FileInfo>,
+
+    @SerializedName("subTabs")
+    val subTabs: List<CloudConfig> = emptyList()
 )
 
 data class FileInfo(

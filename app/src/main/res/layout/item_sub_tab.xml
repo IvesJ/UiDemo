@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 子Tab列表项布局（竖向显示在内容页左侧） -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/subTabTextView"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="16dp"
+    android:textColor="@color/sub_tab_text_color"
+    android:textSize="14sp"
+    android:background="@drawable/sub_tab_item_background"
+    tools:text="子Tab名称" />

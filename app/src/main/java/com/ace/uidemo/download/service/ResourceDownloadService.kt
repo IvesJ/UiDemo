@@ -55,14 +55,11 @@ class ResourceDownloadService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "========== Service onStartCommand ==========")
         serviceScope.launch {
-            Log.d(TAG, "启动下载任务...")
             try {
                 downloadManager.startDownload()
-                Log.d(TAG, "下载任务完成")
             } catch (e: Exception) {
-                Log.e(TAG, "下载任务异常", e)
+                e.printStackTrace()
             }
         }
         return START_STICKY
@@ -71,13 +68,10 @@ class ResourceDownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     private fun observeDownloadProgress() {
-        Log.d(TAG, "开始监听下载进度和配置...")
-
         // 监听配置
         serviceScope.launch {
             downloadManager.configFlow.collect { configs ->
                 _config.value = configs
-                Log.d(TAG, "收到配置更新: ${configs.size} 个Tab")
             }
         }
 
@@ -86,12 +80,6 @@ class ResourceDownloadService : Service() {
             downloadManager.progressFlow.collect { progressMap ->
                 _downloadProgress.value = progressMap
                 updateNotification(progressMap)
-
-                // 打印当前进度概览
-                val completed = progressMap.values.count { it.isCompleted }
-                val failed = progressMap.values.count { it.isFailed }
-                val downloading = progressMap.size - completed - failed
-                Log.d(TAG, "进度更新 - 总计:${progressMap.size}, 完成:$completed, 下载中:$downloading, 失败:$failed")
             }
         }
     }
