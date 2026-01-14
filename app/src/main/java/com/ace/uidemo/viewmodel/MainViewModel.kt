@@ -99,12 +99,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // 根据配置创建所有Tabs（但先不显示）
         val tabs = configs.map { config ->
+            val subTabs = config.subTabsConfig?.map { subConfig ->
+                TabData(
+                    id = "${config.tabTitle}_${subConfig.tabTitle}",
+                    title = subConfig.tabTitle,
+                    mediaItems = subConfig.filesInfo.map { fileInfo ->
+                        createMediaItemFromFileInfo(fileInfo)
+                    },
+                    subTabs = emptyList()
+                )
+            } ?: emptyList()
+
             TabData(
                 id = config.tabTitle,
                 title = config.tabTitle,
                 mediaItems = config.filesInfo.map { fileInfo ->
                     createMediaItemFromFileInfo(fileInfo)
-                }
+                },
+                subTabs = subTabs
             )
         }
 
@@ -112,7 +124,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         Log.d(TAG, "创建了 ${tabs.size} 个Tab配置:")
         tabs.forEach { tab ->
-            Log.d(TAG, "  - ${tab.title}: ${tab.mediaItems.size} 个文件")
+            if (tab.subTabs.isNotEmpty()) {
+                Log.d(TAG, "  - ${tab.title}: ${tab.subTabs.size} 个子Tab")
+                tab.subTabs.forEach { subTab ->
+                    Log.d(TAG, "    - ${subTab.title}: ${subTab.mediaItems.size} 个文件")
+                }
+            } else {
+                Log.d(TAG, "  - ${tab.title}: ${tab.mediaItems.size} 个文件")
+            }
         }
 
         // 检查是否有已经完全下载好的Tab
@@ -187,20 +206,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // 更新allTabs的下载状态（用于判断哪些Tab已完成）
         _allTabs.value.forEach { tabData ->
-            val tabProgress = grouped[tabData.title] ?: emptyList()
-            Log.d(TAG, "[${tabData.title}] 匹配到 ${tabProgress.size} 个文件")
+            // 收集该Tab的所有进度（父级Tab文件 + 子Tab文件）
+            val parentTabProgress = grouped[tabData.title] ?: emptyList()
+            val subTabProgresses = tabData.subTabs.flatMap { subTab ->
+                grouped["${tabData.title}_${subTab.title}"] ?: emptyList()
+            }
+            val allTabProgress = parentTabProgress + subTabProgresses
+
+            Log.d(TAG, "[${tabData.title}] 父级文件: ${parentTabProgress.size}, 子Tab文件: ${subTabProgresses.size}, 总计: ${allTabProgress.size}")
 
             val newState = when {
-                tabProgress.isEmpty() -> {
+                allTabProgress.isEmpty() -> {
                     Log.d(TAG, "[${tabData.title}] 状态: 未开始（无进度数据）")
                     TabDownloadState.NotStarted
                 }
-                tabProgress.all { it.isCompleted } -> {
+                allTabProgress.all { it.isCompleted } -> {
                     Log.d(TAG, "[${tabData.title}] 状态: 全部完成")
                     TabDownloadState.Completed
                 }
-                tabProgress.any { it.isFailed } -> {
-                    val error = tabProgress.first { it.isFailed }.state as DownloadState.Failed
+                allTabProgress.any { it.isFailed } -> {
+                    val error = allTabProgress.first { it.isFailed }.state as DownloadState.Failed
                     Log.d(TAG, "[${tabData.title}] 状态: 失败 - ${error.error}")
                     // 触发显示重试对话框
                     _showRetryDialog.value = tabData.title
@@ -208,17 +233,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 else -> {
                     // 计算综合进度：已完成文件算100%，下载中的文件取其实际进度
-                    val totalProgress = tabProgress.sumOf { progress ->
+                    val totalProgress = allTabProgress.sumOf { progress ->
                         when (val state = progress.state) {
                             is DownloadState.Completed -> 100
                             is DownloadState.Downloading -> state.progress
                             else -> 0
                         }
                     }
-                    val averageProgress = totalProgress / tabProgress.size
+                    val averageProgress = if (allTabProgress.isNotEmpty()) {
+                        totalProgress / allTabProgress.size
+                    } else {
+                        0
+                    }
 
-                    val completedFiles = tabProgress.count { it.isCompleted }
-                    Log.d(TAG, "[${tabData.title}] 状态: 下载中 $completedFiles/${tabProgress.size} (综合进度: $averageProgress%)")
+                    val completedFiles = allTabProgress.count { it.isCompleted }
+                    Log.d(TAG, "[${tabData.title}] 状态: 下载中 $completedFiles/${allTabProgress.size} (综合进度: $averageProgress%)")
                     TabDownloadState.Downloading(averageProgress)
                 }
             }
@@ -242,7 +271,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // 找出所有文件都已下载完成的Tab
         val newCompletedTabs = _allTabs.value.filter { tabData ->
-            val allFilesExist = tabData.mediaItems.all { mediaItem ->
+            // 检查父级Tab的文件
+            val parentFilesExist = tabData.mediaItems.all { mediaItem ->
                 val fileName = when (mediaItem) {
                     is MediaItem.Image -> mediaItem.id
                     is MediaItem.Video -> mediaItem.id
@@ -250,6 +280,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val localFile = File(getApplication<Application>().filesDir, "media/$fileName")
                 localFile.exists()
             }
+
+            // 检查子Tab的文件
+            val subTabsFilesExist = tabData.subTabs.all { subTab ->
+                subTab.mediaItems.all { mediaItem ->
+                    val fileName = when (mediaItem) {
+                        is MediaItem.Image -> mediaItem.id
+                        is MediaItem.Video -> mediaItem.id
+                    }
+                    val localFile = File(getApplication<Application>().filesDir, "media/$fileName")
+                    localFile.exists()
+                }
+            }
+
+            val allFilesExist = parentFilesExist && subTabsFilesExist
 
             if (allFilesExist) {
                 Log.d(TAG, "  ✓ [${tabData.title}] 所有文件已下载完成")
@@ -283,6 +327,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             localPath = localPath
                         )
                     }
+                },
+                subTabs = tabData.subTabs.map { subTab ->
+                    TabData(
+                        id = subTab.id,
+                        title = subTab.title,
+                        mediaItems = subTab.mediaItems.map { mediaItem ->
+                            val fileName = mediaItem.id
+                            val localPath = File(getApplication<Application>().filesDir, "media/$fileName").absolutePath
+
+                            when (mediaItem) {
+                                is MediaItem.Image -> MediaItem.Image(
+                                    id = mediaItem.id,
+                                    imageUrl = mediaItem.imageUrl,
+                                    localPath = localPath
+                                )
+                                is MediaItem.Video -> MediaItem.Video(
+                                    id = mediaItem.id,
+                                    videoUrl = mediaItem.videoUrl,
+                                    duration = mediaItem.duration,
+                                    localPath = localPath
+                                )
+                            }
+                        },
+                        subTabs = emptyList()
+                    )
                 }
             )
         }

@@ -4,6 +4,7 @@ data class TabData(
     val id: String,
     val title: String,
     val mediaItems: List<MediaItem>,
+    val subTabs: List<TabData>,
     val downloadState: TabDownloadState = TabDownloadState.NotStarted
 )
 

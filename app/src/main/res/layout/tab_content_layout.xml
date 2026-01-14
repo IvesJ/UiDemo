@@ -6,16 +6,37 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- 媒体内容ViewPager2（内层） -->
-    <com.ace.uidemo.widget.NestedScrollableHost
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <androidx.viewpager2.widget.ViewPager2
-            android:id="@+id/mediaViewPager"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-    </com.ace.uidemo.widget.NestedScrollableHost>
+        <!-- 左侧子Tab列表（竖向） -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/subTabRecyclerView"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- 媒体内容ViewPager2（内层） -->
+        <com.ace.uidemo.widget.NestedScrollableHost
+            android:id="@+id/scrollableHost"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/mediaViewPager"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </com.ace.uidemo.widget.NestedScrollableHost>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- 底部指示器（独立于每个Tab） -->
     <androidx.constraintlayout.widget.ConstraintLayout

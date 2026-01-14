@@ -5,7 +5,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.ace.uidemo.model.MediaItem
 
 class MediaPagerAdapter(
-    private val mediaItems: List<MediaItem>,
+    private var mediaItems: List<MediaItem>,
     private val onVideoReady: (position: Int, duration: Long) -> Unit,
     private val onVideoCompleted: (position: Int) -> Unit,
     private val onVideoClicked: () -> Unit
@@ -67,6 +67,15 @@ class MediaPagerAdapter(
     }
 
     override fun getItemCount(): Int = mediaItems.size
+
+    /**
+     * 更新媒体项列表（用于子Tab切换）
+     */
+    fun updateMediaItems(newMediaItems: List<MediaItem>) {
+        releaseAllVideos()
+        mediaItems = newMediaItems
+        notifyDataSetChanged()
+    }
 
     fun getVideoHolder(position: Int): VideoViewHolder? {
         return videoHolders[position]

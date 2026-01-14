@@ -80,6 +80,72 @@ class DownloadManager(private val context: Context) {
                 )
             ),
             CloudConfig(
+                tabTitle = "分类",
+                filesInfo = emptyList(), // 父级Tab可以没有自己的媒体内容
+                subTabsConfig = listOf(
+                    // 子Tab: 影视
+                    CloudConfig(
+                        tabTitle = "影视",
+                        filesInfo = listOf(
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "movie_1.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=10",
+                                md5 = "mock_md5_10"
+                            ),
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "movie_2.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=11",
+                                md5 = "mock_md5_11"
+                            ),
+                            FileInfo(
+                                pageType = "video",
+                                pageRes = "movie_1.mp4",
+                                pageUrl = "http://www.w3school.com.cn/i/movie.mp4",
+                                md5 = "mock_md5_12"
+                            )
+                        )
+                    ),
+                    // 子Tab: 音乐
+                    CloudConfig(
+                        tabTitle = "音乐",
+                        filesInfo = listOf(
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "music_1.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=20",
+                                md5 = "mock_md5_20"
+                            ),
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "music_2.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=21",
+                                md5 = "mock_md5_21"
+                            )
+                        )
+                    ),
+                    // 子Tab: 游戏
+                    CloudConfig(
+                        tabTitle = "游戏",
+                        filesInfo = listOf(
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "game_1.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=30",
+                                md5 = "mock_md5_30"
+                            ),
+                            FileInfo(
+                                pageType = "video",
+                                pageRes = "game_1.mp4",
+                                pageUrl = "https://disk.sample.cat/samples/mp4/1416529-sd_640_360_30fps.mp4",
+                                md5 = "mock_md5_31"
+                            )
+                        )
+                    )
+                )
+            ),
+            CloudConfig(
                 tabTitle = "关注",
                 filesInfo = listOf(
                     FileInfo(
@@ -113,7 +179,8 @@ class DownloadManager(private val context: Context) {
 
             // 2. 准备下载任务
             val allTasks = configs.flatMap { config ->
-                config.filesInfo.map { fileInfo ->
+                // 父级Tab的文件
+                val parentTasks = config.filesInfo.map { fileInfo ->
                     DownloadTask(
                         tabId = config.tabTitle,
                         fileName = fileInfo.pageRes,
@@ -122,6 +189,20 @@ class DownloadManager(private val context: Context) {
                         fileType = fileInfo.pageType
                     )
                 }
+                // 子Tab的文件
+                val subTabTasks = config.subTabsConfig?.flatMap { subConfig ->
+                    subConfig.filesInfo.map { fileInfo ->
+                        DownloadTask(
+                            tabId = "${config.tabTitle}_${subConfig.tabTitle}",
+                            fileName = fileInfo.pageRes,
+                            url = fileInfo.pageUrl,
+                            md5 = fileInfo.md5,
+                            fileType = fileInfo.pageType
+                        )
+                    }
+                } ?: emptyList()
+
+                parentTasks + subTabTasks
             }
             Log.d(TAG, "准备下载任务总数: ${allTasks.size}")
             allTasks.forEach { task ->
