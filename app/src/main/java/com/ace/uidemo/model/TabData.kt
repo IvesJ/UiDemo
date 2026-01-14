@@ -1,11 +1,14 @@
 package com.ace.uidemo.model
 
+import java.io.Serializable
+
 data class TabData(
     val id: String,
     val title: String,
     val mediaItems: List<MediaItem>,
+    val subTabs: List<TabData> = emptyList(),
     val downloadState: TabDownloadState = TabDownloadState.NotStarted
-)
+) : Serializable
 
 sealed class TabDownloadState {
     object NotStarted : TabDownloadState()

@@ -39,6 +39,7 @@ class DownloadManager(private val context: Context) {
     // Mock数据 - 用于测试
     private fun getMockConfig(): List<CloudConfig> {
         return listOf(
+            // 第一个Tab：推荐（无子Tab）
             CloudConfig(
                 tabTitle = "推荐",
                 filesInfo = listOf(
@@ -62,23 +63,71 @@ class DownloadManager(private val context: Context) {
                     )
                 )
             ),
+            // 第二个Tab：热门（带子Tab）
             CloudConfig(
                 tabTitle = "热门",
-                filesInfo = listOf(
-                    FileInfo(
-                        pageType = "image",
-                        pageRes = "image_3.jpg",
-                        pageUrl = "https://picsum.photos/400/600?random=3",
-                        md5 = "mock_md5_4"
+                filesInfo = emptyList(),
+                subTabs = listOf(
+                    CloudConfig(
+                        tabTitle = "今日热门",
+                        filesInfo = listOf(
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "hot_today_1.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=10",
+                                md5 = "mock_md5_10"
+                            ),
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "hot_today_2.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=11",
+                                md5 = "mock_md5_11"
+                            )
+                        )
                     ),
-                    FileInfo(
-                        pageType = "image",
-                        pageRes = "image_4.jpg",
-                        pageUrl = "https://picsum.photos/400/600?random=4",
-                        md5 = "mock_md5_5"
+                    CloudConfig(
+                        tabTitle = "本周热门",
+                        filesInfo = listOf(
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "hot_week_1.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=12",
+                                md5 = "mock_md5_12"
+                            ),
+                            FileInfo(
+                                pageType = "video",
+                                pageRes = "hot_week_video.mp4",
+                                pageUrl = "http://www.w3school.com.cn/i/movie.mp4",
+                                md5 = "mock_md5_13"
+                            )
+                        )
+                    ),
+                    CloudConfig(
+                        tabTitle = "本月热门",
+                        filesInfo = listOf(
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "hot_month_1.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=14",
+                                md5 = "mock_md5_14"
+                            ),
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "hot_month_2.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=15",
+                                md5 = "mock_md5_15"
+                            ),
+                            FileInfo(
+                                pageType = "image",
+                                pageRes = "hot_month_3.jpg",
+                                pageUrl = "https://picsum.photos/400/600?random=16",
+                                md5 = "mock_md5_16"
+                            )
+                        )
                     )
                 )
             ),
+            // 第三个Tab：关注（无子Tab）
             CloudConfig(
                 tabTitle = "关注",
                 filesInfo = listOf(
@@ -91,7 +140,7 @@ class DownloadManager(private val context: Context) {
                     FileInfo(
                         pageType = "video",
                         pageRes = "video_2.mp4",
-                        pageUrl = "https://disk.sample.cat/samples/mp4/1416529-sd_640_360_30fps.mp4",
+                        pageUrl = "http://www.w3school.com.cn/i/movie.mp4",
                         md5 = "mock_md5_7"
                     )
                 )
@@ -111,18 +160,39 @@ class DownloadManager(private val context: Context) {
             _configFlow.value = configs
             Log.d(TAG, "配置已发送到configFlow")
 
-            // 2. 准备下载任务
-            val allTasks = configs.flatMap { config ->
-                config.filesInfo.map { fileInfo ->
-                    DownloadTask(
-                        tabId = config.tabTitle,
-                        fileName = fileInfo.pageRes,
-                        url = fileInfo.pageUrl,
-                        md5 = fileInfo.md5,
-                        fileType = fileInfo.pageType
+            // 2. 准备下载任务（包括子Tab中的文件）
+            val allTasks = mutableListOf<DownloadTask>()
+
+            configs.forEach { config ->
+                // 添加主Tab的文件
+                config.filesInfo.forEach { fileInfo ->
+                    allTasks.add(
+                        DownloadTask(
+                            tabId = config.tabTitle,
+                            fileName = fileInfo.pageRes,
+                            url = fileInfo.pageUrl,
+                            md5 = fileInfo.md5,
+                            fileType = fileInfo.pageType
+                        )
                     )
                 }
+
+                // 添加子Tab的文件
+                config.subTabs.forEach { subTab ->
+                    subTab.filesInfo.forEach { fileInfo ->
+                        allTasks.add(
+                            DownloadTask(
+                                tabId = "${config.tabTitle}/${subTab.tabTitle}",
+                                fileName = fileInfo.pageRes,
+                                url = fileInfo.pageUrl,
+                                md5 = fileInfo.md5,
+                                fileType = fileInfo.pageType
+                            )
+                        )
+                    }
+                }
             }
+
             Log.d(TAG, "准备下载任务总数: ${allTasks.size}")
             allTasks.forEach { task ->
                 Log.d(TAG, "  - [${task.tabId}] ${task.fileName} (${task.fileType})")

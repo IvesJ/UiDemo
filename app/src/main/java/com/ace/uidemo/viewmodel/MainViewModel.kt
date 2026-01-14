@@ -97,26 +97,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun onConfigReceived(configs: List<CloudConfig>) {
         Log.d(TAG, "========== 处理配置数据 ==========")
 
-        // 根据配置创建所有Tabs（但先不显示）
+        // 根据配置创建所有Tabs（递归处理subTabs）
         val tabs = configs.map { config ->
-            TabData(
-                id = config.tabTitle,
-                title = config.tabTitle,
-                mediaItems = config.filesInfo.map { fileInfo ->
-                    createMediaItemFromFileInfo(fileInfo)
-                }
-            )
+            convertCloudConfigToTabData(config)
         }
 
         _allTabs.value = tabs
 
         Log.d(TAG, "创建了 ${tabs.size} 个Tab配置:")
         tabs.forEach { tab ->
-            Log.d(TAG, "  - ${tab.title}: ${tab.mediaItems.size} 个文件")
+            Log.d(TAG, "  - ${tab.title}: ${tab.mediaItems.size} 个文件, ${tab.subTabs.size} 个子Tab")
+            tab.subTabs.forEach { subTab ->
+                Log.d(TAG, "      - ${subTab.title}: ${subTab.mediaItems.size} 个文件")
+            }
         }
 
         // 检查是否有已经完全下载好的Tab
         checkAndShowCompletedTabs()
+    }
+
+    /**
+     * 递归转换 CloudConfig 到 TabData
+     */
+    private fun convertCloudConfigToTabData(config: CloudConfig): TabData {
+        return TabData(
+            id = config.tabTitle,
+            title = config.tabTitle,
+            mediaItems = config.filesInfo.map { fileInfo ->
+                createMediaItemFromFileInfo(fileInfo)
+            },
+            subTabs = config.subTabs.map { subConfig ->
+                convertCloudConfigToTabData(subConfig)
+            }
+        )
     }
 
     /**
@@ -240,51 +253,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun checkAndShowCompletedTabs() {
         Log.d(TAG, "========== 检查已完成的Tab ==========")
 
-        // 找出所有文件都已下载完成的Tab
+        // 找出所有文件都已下载完成的Tab（包括子Tab的文件）
         val newCompletedTabs = _allTabs.value.filter { tabData ->
-            val allFilesExist = tabData.mediaItems.all { mediaItem ->
-                val fileName = when (mediaItem) {
-                    is MediaItem.Image -> mediaItem.id
-                    is MediaItem.Video -> mediaItem.id
-                }
-                val localFile = File(getApplication<Application>().filesDir, "media/$fileName")
-                localFile.exists()
-            }
-
-            if (allFilesExist) {
-                Log.d(TAG, "  ✓ [${tabData.title}] 所有文件已下载完成")
-            } else {
-                Log.d(TAG, "  ✗ [${tabData.title}] 仍有文件未下载")
-            }
-
-            allFilesExist
+            isTabFullyDownloaded(tabData)
         }
 
         // 更新已完成Tab列表
         val completedTabsWithLocalPaths = newCompletedTabs.map { tabData ->
-            // 重新创建MediaItems，确保使用本地路径
-            TabData(
-                id = tabData.id,
-                title = tabData.title,
-                mediaItems = tabData.mediaItems.map { mediaItem ->
-                    val fileName = mediaItem.id
-                    val localPath = File(getApplication<Application>().filesDir, "media/$fileName").absolutePath
-
-                    when (mediaItem) {
-                        is MediaItem.Image -> MediaItem.Image(
-                            id = mediaItem.id,
-                            imageUrl = mediaItem.imageUrl,
-                            localPath = localPath
-                        )
-                        is MediaItem.Video -> MediaItem.Video(
-                            id = mediaItem.id,
-                            videoUrl = mediaItem.videoUrl,
-                            duration = mediaItem.duration,
-                            localPath = localPath
-                        )
-                    }
-                }
-            )
+            createTabDataWithLocalPaths(tabData)
         }
 
         _completedTabs.value = completedTabsWithLocalPaths
@@ -296,6 +272,73 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _showContent.value = true
             hasShownContent = true
         }
+    }
+
+    /**
+     * 检查Tab是否完全下载（包括子Tab）
+     */
+    private fun isTabFullyDownloaded(tabData: TabData): Boolean {
+        // 检查主Tab的媒体文件
+        val mainFilesExist = tabData.mediaItems.all { mediaItem ->
+            val fileName = mediaItem.id
+            val localFile = File(getApplication<Application>().filesDir, "media/$fileName")
+            localFile.exists()
+        }
+
+        if (!mainFilesExist && tabData.mediaItems.isNotEmpty()) {
+            Log.d(TAG, "  ✗ [${tabData.title}] 主文件仍有未下载")
+            return false
+        }
+
+        // 检查子Tab的媒体文件
+        val subTabsComplete = tabData.subTabs.all { subTab ->
+            isTabFullyDownloaded(subTab)
+        }
+
+        if (!subTabsComplete && tabData.subTabs.isNotEmpty()) {
+            Log.d(TAG, "  ✗ [${tabData.title}] 子Tab仍有文件未下载")
+            return false
+        }
+
+        // 如果没有主文件也没有子Tab，不算完成
+        if (tabData.mediaItems.isEmpty() && tabData.subTabs.isEmpty()) {
+            Log.d(TAG, "  ✗ [${tabData.title}] 无内容")
+            return false
+        }
+
+        Log.d(TAG, "  ✓ [${tabData.title}] 所有文件已下载完成")
+        return true
+    }
+
+    /**
+     * 递归创建带本地路径的TabData
+     */
+    private fun createTabDataWithLocalPaths(tabData: TabData): TabData {
+        return TabData(
+            id = tabData.id,
+            title = tabData.title,
+            mediaItems = tabData.mediaItems.map { mediaItem ->
+                val fileName = mediaItem.id
+                val localPath = File(getApplication<Application>().filesDir, "media/$fileName").absolutePath
+
+                when (mediaItem) {
+                    is MediaItem.Image -> MediaItem.Image(
+                        id = mediaItem.id,
+                        imageUrl = mediaItem.imageUrl,
+                        localPath = localPath
+                    )
+                    is MediaItem.Video -> MediaItem.Video(
+                        id = mediaItem.id,
+                        videoUrl = mediaItem.videoUrl,
+                        duration = mediaItem.duration,
+                        localPath = localPath
+                    )
+                }
+            },
+            subTabs = tabData.subTabs.map { subTab ->
+                createTabDataWithLocalPaths(subTab)
+            }
+        )
     }
 
     /**

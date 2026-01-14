@@ -1,10 +1,12 @@
 package com.ace.uidemo.viewholder
 
 import androidx.lifecycle.LifecycleCoroutineScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.ace.uidemo.adapter.MediaPagerAdapter
-import com.ace.uidemo.databinding.TabContentLayoutBinding
+import com.ace.uidemo.adapter.SubTabAdapter
+import com.ace.uidemo.databinding.TabContentWithSubtabsLayoutBinding
 import com.ace.uidemo.model.MediaItem
 import com.ace.uidemo.model.TabData
 import kotlinx.coroutines.Job
@@ -13,50 +15,54 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * 单个Tab的ViewHolder，管理该Tab的媒体轮播（无子Tab的情况）
+ * 带子Tab的ViewHolder，管理子Tab轮播和媒体轮播
+ * 逻辑：子Tab的所有媒体轮播完成后，切换到下一个子Tab
+ *       所有子Tab轮播完成后，通知父级Tab切换
  */
-class TabContentViewHolder(
-    private val binding: TabContentLayoutBinding,
+class TabWithSubTabsViewHolder(
+    private val binding: TabContentWithSubtabsLayoutBinding,
     private val lifecycleScope: LifecycleCoroutineScope,
-    private val onTabCompleted: () -> Unit, // Tab轮播完成回调
-    private val onPauseStateChanged: (Boolean) -> Unit // 暂停状态改变回调
+    private val onTabCompleted: () -> Unit,
+    private val onPauseStateChanged: (Boolean) -> Unit
 ) : RecyclerView.ViewHolder(binding.root), ITabContentViewHolder {
 
+    private var subTabAdapter: SubTabAdapter? = null
     private var mediaPagerAdapter: MediaPagerAdapter? = null
+    private var subTabs: List<TabData> = emptyList()
+    private var currentSubTabIndex = 0
     private var currentMediaIndex = 0
     private var isPaused = false
     private var pausedElapsedTime = 0L
     private var autoScrollJob: Job? = null
-    private var mediaItems: List<MediaItem> = emptyList()
+
+    // 当前子Tab的媒体项
+    private var currentMediaItems: List<MediaItem> = emptyList()
 
     init {
-        setupMediaViewPager()
+        setupSubTabViewPager()
     }
 
-    private fun setupMediaViewPager() {
-        binding.mediaViewPager.apply {
+    private fun setupSubTabViewPager() {
+        // 设置子Tab内容的ViewPager2
+        binding.subTabViewPager.apply {
             offscreenPageLimit = 1
+            // 禁用用户滑动，只允许代码控制
+            isUserInputEnabled = false
 
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
                     super.onPageSelected(position)
                     currentMediaIndex = position
 
-                    // 停止之前的自动滚动
                     stopAutoScroll()
-
-                    // 重置所有视频
                     mediaPagerAdapter?.pauseAllVideos()
                     mediaPagerAdapter?.resetAllVideos()
 
-                    // 更新指示器
                     binding.indicatorView.setCurrentPosition(position)
 
-                    // 启动新的自动滚动，并恢复当前视频播放
                     if (!isPaused) {
-                        val currentMedia = mediaItems.getOrNull(position)
+                        val currentMedia = currentMediaItems.getOrNull(position)
                         if (currentMedia is MediaItem.Video) {
-                            // 恢复当前视频播放
                             mediaPagerAdapter?.resumeVideo(position)
                         }
                         startAutoScroll(position)
@@ -67,28 +73,77 @@ class TabContentViewHolder(
     }
 
     fun bind(tabData: TabData) {
-        mediaItems = tabData.mediaItems
+        subTabs = tabData.subTabs
+        currentSubTabIndex = 0
         currentMediaIndex = 0
         isPaused = false
         pausedElapsedTime = 0L
 
-        // 先设置指示器
-        binding.indicatorView.setupWithMediaItems(mediaItems.size)
+        // 设置左侧子Tab列表
+        setupSubTabList()
+
+        // 绑定第一个子Tab的内容
+        bindSubTabContent(0)
+    }
+
+    private fun setupSubTabList() {
+        subTabAdapter = SubTabAdapter(subTabs) { position ->
+            // 用户点击子Tab时的处理
+            if (position != currentSubTabIndex) {
+                switchToSubTab(position)
+            }
+        }
+
+        binding.subTabRecyclerView.apply {
+            layoutManager = LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false)
+            adapter = subTabAdapter
+        }
+    }
+
+    /**
+     * 切换到指定的子Tab
+     */
+    private fun switchToSubTab(position: Int) {
+        if (position < 0 || position >= subTabs.size) return
+
+        stopAutoScroll()
+        mediaPagerAdapter?.pauseAllVideos()
+        mediaPagerAdapter?.resetAllVideos()
+
+        currentSubTabIndex = position
+        currentMediaIndex = 0
+        pausedElapsedTime = 0L
+
+        // 更新左侧选中状态
+        subTabAdapter?.setSelectedPosition(position)
+
+        // 绑定新子Tab的内容
+        bindSubTabContent(position)
+    }
+
+    /**
+     * 绑定子Tab的媒体内容
+     */
+    private fun bindSubTabContent(subTabIndex: Int) {
+        val subTab = subTabs.getOrNull(subTabIndex) ?: return
+        currentMediaItems = subTab.mediaItems
+
+        // 设置指示器
+        binding.indicatorView.setupWithMediaItems(currentMediaItems.size)
         binding.indicatorView.setCurrentPosition(0)
 
         // 设置媒体适配器
         mediaPagerAdapter = MediaPagerAdapter(
-            mediaItems = mediaItems,
+            mediaItems = currentMediaItems,
             onVideoReady = { position, duration ->
                 if (position == currentMediaIndex && !isPaused) {
-                    // 启动当前视频播放
                     mediaPagerAdapter?.resumeVideo(position)
                     startAutoScroll(position)
                 }
             },
             onVideoCompleted = { position ->
                 if (position == currentMediaIndex) {
-                    moveToNext()
+                    moveToNextMedia()
                 }
             },
             onVideoClicked = {
@@ -96,11 +151,13 @@ class TabContentViewHolder(
             }
         )
 
-        binding.mediaViewPager.adapter = mediaPagerAdapter
-        binding.mediaViewPager.setCurrentItem(0, false)
+        binding.subTabViewPager.adapter = mediaPagerAdapter
+        binding.subTabViewPager.setCurrentItem(0, false)
 
-        // 启动自动滚动
-        startAutoScroll(0)
+        // 开始自动轮播
+        if (!isPaused) {
+            startAutoScroll(0)
+        }
     }
 
     /**
@@ -109,9 +166,9 @@ class TabContentViewHolder(
     private fun startAutoScroll(position: Int) {
         stopAutoScroll()
 
-        if (position < 0 || position >= mediaItems.size) return
+        if (position < 0 || position >= currentMediaItems.size) return
 
-        val mediaItem = mediaItems[position]
+        val mediaItem = currentMediaItems[position]
         val duration = when (mediaItem) {
             is MediaItem.Image -> 5000L
             is MediaItem.Video -> {
@@ -134,7 +191,7 @@ class TabContentViewHolder(
                 binding.indicatorView.updateProgress(position, progress.toInt())
 
                 if (elapsed >= duration) {
-                    moveToNext()
+                    moveToNextMedia()
                     break
                 }
 
@@ -144,9 +201,6 @@ class TabContentViewHolder(
         }
     }
 
-    /**
-     * 停止自动滚动
-     */
     private fun stopAutoScroll() {
         autoScrollJob?.cancel()
         autoScrollJob = null
@@ -155,11 +209,25 @@ class TabContentViewHolder(
     /**
      * 移动到下一个媒体项
      */
-    private fun moveToNext() {
-        if (currentMediaIndex < mediaItems.size - 1) {
-            binding.mediaViewPager.setCurrentItem(currentMediaIndex + 1, true)
+    private fun moveToNextMedia() {
+        if (currentMediaIndex < currentMediaItems.size - 1) {
+            // 还有下一个媒体，切换到下一个
+            binding.subTabViewPager.setCurrentItem(currentMediaIndex + 1, true)
         } else {
-            // 到达最后一项，通知Fragment切换到下一个Tab
+            // 当前子Tab的所有媒体播放完成，切换到下一个子Tab
+            moveToNextSubTab()
+        }
+    }
+
+    /**
+     * 移动到下一个子Tab
+     */
+    private fun moveToNextSubTab() {
+        if (currentSubTabIndex < subTabs.size - 1) {
+            // 还有下一个子Tab
+            switchToSubTab(currentSubTabIndex + 1)
+        } else {
+            // 所有子Tab都轮播完成，通知父级Tab完成
             onTabCompleted()
         }
     }
@@ -174,23 +242,23 @@ class TabContentViewHolder(
             stopAutoScroll()
             mediaPagerAdapter?.pauseAllVideos()
 
-            val mediaItem = mediaItems[currentMediaIndex]
-            val duration = when (mediaItem) {
-                is MediaItem.Image -> 5000L
-                is MediaItem.Video -> mediaItem.duration
+            val mediaItem = currentMediaItems.getOrNull(currentMediaIndex)
+            if (mediaItem != null) {
+                val duration = when (mediaItem) {
+                    is MediaItem.Image -> 5000L
+                    is MediaItem.Video -> mediaItem.duration
+                }
+                val currentProgress = binding.indicatorView.getCurrentProgress(currentMediaIndex)
+                pausedElapsedTime = (duration * currentProgress / 100f).toLong()
             }
-
-            val currentProgress = binding.indicatorView.getCurrentProgress(currentMediaIndex)
-            pausedElapsedTime = (duration * currentProgress / 100f).toLong()
         } else {
-            val mediaItem = mediaItems[currentMediaIndex]
+            val mediaItem = currentMediaItems.getOrNull(currentMediaIndex)
             if (mediaItem is MediaItem.Video) {
                 mediaPagerAdapter?.resumeVideo(currentMediaIndex)
             }
             startAutoScroll(currentMediaIndex)
         }
 
-        // 通知Fragment更新暂停按钮状态
         onPauseStateChanged(isPaused)
     }
 
@@ -203,7 +271,7 @@ class TabContentViewHolder(
             stopAutoScroll()
             mediaPagerAdapter?.pauseAllVideos()
 
-            val mediaItem = mediaItems.getOrNull(currentMediaIndex)
+            val mediaItem = currentMediaItems.getOrNull(currentMediaIndex)
             if (mediaItem != null) {
                 val duration = when (mediaItem) {
                     is MediaItem.Image -> 5000L
@@ -221,7 +289,7 @@ class TabContentViewHolder(
     override fun resume() {
         if (isPaused) {
             isPaused = false
-            val mediaItem = mediaItems.getOrNull(currentMediaIndex)
+            val mediaItem = currentMediaItems.getOrNull(currentMediaIndex)
             if (mediaItem is MediaItem.Video) {
                 mediaPagerAdapter?.resumeVideo(currentMediaIndex)
             }
@@ -245,36 +313,35 @@ class TabContentViewHolder(
     /**
      * 获取当前媒体项
      */
-    override fun getCurrentMediaItem(): MediaItem? = mediaItems.getOrNull(currentMediaIndex)
+    override fun getCurrentMediaItem(): MediaItem? = currentMediaItems.getOrNull(currentMediaIndex)
 
     /**
-     * 是否在最后一个媒体项
+     * 是否在最后一项（子Tab的最后一个媒体且是最后一个子Tab）
      */
-    override fun isAtLastItem(): Boolean = currentMediaIndex == mediaItems.size - 1
+    override fun isAtLastItem(): Boolean {
+        return currentSubTabIndex == subTabs.size - 1 &&
+                currentMediaIndex == currentMediaItems.size - 1
+    }
 
     /**
-     * 重置到第一个媒体项并开始播放（用于Tab切换时）
+     * 重置到第一个子Tab的第一个媒体项并开始播放
      */
     override fun resetToFirst() {
-        if (mediaItems.isEmpty()) return
+        if (subTabs.isEmpty()) return
 
         stopAutoScroll()
         mediaPagerAdapter?.pauseAllVideos()
         mediaPagerAdapter?.resetAllVideos()
 
+        currentSubTabIndex = 0
         currentMediaIndex = 0
         isPaused = false
         pausedElapsedTime = 0L
 
-        binding.indicatorView.setCurrentPosition(0)
-        binding.mediaViewPager.setCurrentItem(0, false)
+        // 重置左侧子Tab选中状态
+        subTabAdapter?.setSelectedPosition(0)
 
-        // 如果第一个是视频，恢复播放
-        val firstMedia = mediaItems.firstOrNull()
-        if (firstMedia is MediaItem.Video) {
-            mediaPagerAdapter?.resumeVideo(0)
-        }
-
-        startAutoScroll(0)
+        // 重新绑定第一个子Tab的内容
+        bindSubTabContent(0)
     }
 }
