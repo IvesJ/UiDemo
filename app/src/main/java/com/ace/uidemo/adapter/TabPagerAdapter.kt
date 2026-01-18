@@ -21,7 +21,8 @@ class TabPagerAdapter(
     private val tabs: List<TabData>,
     private val lifecycleScope: LifecycleCoroutineScope,
     private val onTabCompleted: () -> Unit,
-    private val onPauseStateChanged: (Boolean) -> Unit
+    private val onPauseStateChanged: (Boolean) -> Unit,
+    private val onBoundaryReached: ((isLeft: Boolean) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
@@ -51,7 +52,8 @@ class TabPagerAdapter(
                     binding = binding,
                     lifecycleScope = lifecycleScope,
                     onTabCompleted = onTabCompleted,
-                    onPauseStateChanged = onPauseStateChanged
+                    onPauseStateChanged = onPauseStateChanged,
+                    onBoundaryReached = onBoundaryReached
                 )
             }
             else -> {

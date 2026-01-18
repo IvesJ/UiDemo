@@ -3,7 +3,12 @@
     "allow": [
       "Bash(./gradlew assembleDebug:*)",
       "Bash(./gradlew compileDebugKotlin:*)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(gradlew assembleDebug)",
+      "Bash(.gradlew build)",
+      "Bash(gradlew.bat build)",
+      "Bash(./gradlew build)",
+      "Bash(find . -name \"lint-results-debug.txt\" -exec grep -n \"Error:\\\\|RecyclerView\" {} ;)"
     ]
   }
 }

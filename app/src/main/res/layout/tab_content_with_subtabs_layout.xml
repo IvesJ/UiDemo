@@ -26,10 +26,17 @@
             android:layout_height="match_parent"
             android:layout_weight="1">
 
-            <!-- 子Tab内容ViewPager2 -->
+            <!-- 子Tab切换ViewPager2（用于子Tab间的滑动切换） -->
+            <com.ace.uidemo.widget.NestedViewPager2
+                android:id="@+id/subTabSwitchPager"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <!-- 媒体内容ViewPager2（用于媒体轮播，隐藏在子Tab切换下方） -->
             <com.ace.uidemo.widget.NestedScrollableHost
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
+                android:layout_height="match_parent"
+                android:visibility="gone">
 
                 <androidx.viewpager2.widget.ViewPager2
                     android:id="@+id/subTabViewPager"

@@ -29,11 +29,14 @@ class SubTabAdapter(
     override fun onBindViewHolder(holder: SubTabViewHolder, position: Int) {
         holder.bind(subTabs[position], position == selectedPosition)
         holder.itemView.setOnClickListener {
-            val oldPosition = selectedPosition
-            selectedPosition = position
-            notifyItemChanged(oldPosition)
-            notifyItemChanged(position)
-            onSubTabSelected(position)
+            val adapterPosition = holder.adapterPosition
+            if (adapterPosition != RecyclerView.NO_POSITION) {
+                val oldPosition = selectedPosition
+                selectedPosition = adapterPosition
+                notifyItemChanged(oldPosition)
+                notifyItemChanged(adapterPosition)
+                onSubTabSelected(adapterPosition)
+            }
         }
     }
 

@@ -74,7 +74,7 @@
             android:contentDescription="下载"
             android:scaleType="centerInside"
             android:src="@android:drawable/stat_sys_download"
-            android:tint="#FFFFFF" />
+            app:tint="#FFFFFF" />
     </LinearLayout>
 
     <!-- 底部控制栏 - 浮动在内容上方 -->
@@ -95,7 +95,7 @@
             android:contentDescription="暂停/播放"
             android:scaleType="fitCenter"
             android:src="@android:drawable/ic_media_pause"
-            android:tint="#FFFFFF"
+            app:tint="#FFFFFF"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
