@@ -7,11 +7,13 @@ import android.view.MotionEvent
 import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import androidx.viewpager2.widget.ViewPager2
+import com.ace.uidemo.model.NestedPagerConfig
 import kotlin.math.abs
 
 /**
  * 自定义ViewPager2包装器，解决嵌套滑动冲突
  * 支持在边界时将滑动事件传递给父ViewPager2
+ * 使用配置化参数提高可维护性
  */
 class NestedViewPager2 @JvmOverloads constructor(
     context: Context,
@@ -26,7 +28,7 @@ class NestedViewPager2 @JvmOverloads constructor(
     private val viewPager: ViewPager2 = ViewPager2(context)
     private var initialX = 0f
     private var initialY = 0f
-    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private val touchSlop = (ViewConfiguration.get(context).scaledTouchSlop * NestedPagerConfig.TOUCH_SLOP_MULTIPLIER).toInt()
 
     // 回调接口，用于通知父级进行切换
     var onBoundaryReached: ((isLeft: Boolean) -> Unit)? = null
@@ -71,12 +73,12 @@ class NestedViewPager2 @JvmOverloads constructor(
 
                     when {
                         isScrollingLeft && isAtLeftBoundary -> {
-                            // 在左边界且向右滑动
-                            Log.d(TAG, "Left boundary reached")
+                            // 在左边界且向右滑动（想看前一个内容）
+                            Log.d(TAG, "Left boundary + scrolling right: notify parent for previous")
                             onBoundaryReached?.invoke(true)
 
                             if (consumeBoundaryEvents) {
-                                Log.d(TAG, "Consuming boundary event, not passing to parent")
+                                Log.d(TAG, "Consuming boundary event")
                                 parent.requestDisallowInterceptTouchEvent(true)
                             } else {
                                 Log.d(TAG, "Passing to parent")
@@ -85,12 +87,12 @@ class NestedViewPager2 @JvmOverloads constructor(
                             }
                         }
                         isScrollingRight && isAtRightBoundary -> {
-                            // 在右边界且向左滑动
-                            Log.d(TAG, "Right boundary reached")
+                            // 在右边界且向左滑动（想看下一个内容）
+                            Log.d(TAG, "Right boundary + scrolling left: notify parent for next")
                             onBoundaryReached?.invoke(false)
 
                             if (consumeBoundaryEvents) {
-                                Log.d(TAG, "Consuming boundary event, not passing to parent")
+                                Log.d(TAG, "Consuming boundary event")
                                 parent.requestDisallowInterceptTouchEvent(true)
                             } else {
                                 Log.d(TAG, "Passing to parent")

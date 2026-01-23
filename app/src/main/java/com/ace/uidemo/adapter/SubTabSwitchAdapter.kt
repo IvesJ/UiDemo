@@ -7,8 +7,7 @@ import androidx.lifecycle.LifecycleCoroutineScope
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.ace.uidemo.databinding.ItemSubTabContentBinding
-import com.ace.uidemo.model.MediaItem
-import com.ace.uidemo.model.TabData
+import com.ace.uidemo.model.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -23,7 +22,7 @@ class SubTabSwitchAdapter(
     private val onSubTabCompleted: (Int) -> Unit,
     private val onAllSubTabsCompleted: () -> Unit,
     private val onPauseStateChanged: (Boolean) -> Unit,
-    private val onSwitchToPrevious: (Int) -> Unit // 新增：切换到上一个子tab的回调
+    private val onSwitchToPrevious: (Int) -> Unit // 切换到上一个子tab的回调
 ) : RecyclerView.Adapter<SubTabSwitchAdapter.SubTabViewHolder>() {
 
     companion object {
@@ -33,6 +32,18 @@ class SubTabSwitchAdapter(
     private val viewHolders = mutableMapOf<Int, SubTabViewHolder>()
     private var currentPosition = 0
     private var isPaused = false
+
+    // 使用新的状态管理
+    private val state = NestedViewPagerState()
+
+    init {
+        // 初始化状态
+        state.addStateChangeListener { newState ->
+            Log.d(TAG, "State changed: $newState")
+            currentPosition = newState.currentSubTabIndex
+            isPaused = newState.isPaused
+        }
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SubTabViewHolder {
         Log.d(TAG, "onCreateViewHolder")
@@ -206,7 +217,7 @@ class SubTabSwitchAdapter(
         private var pausedElapsedTime = 0L
         private var autoScrollJob: Job? = null
         private var onCompleted: (() -> Unit)? = null
-        private var onSwitchToPrevious: (() -> Unit)? = null // 新增：切换到上一个子tab的回调
+        private var onSwitchToPrevious: (() -> Unit)? = null // 切换到上一个子tab的回调
         private var lifecycleScope: LifecycleCoroutineScope? = null
         private var myPosition = -1 // 存储当前ViewHolder的真实位置
         private var lastCompletionTime = 0L // 防止重复触发完成事件
@@ -249,7 +260,7 @@ class SubTabSwitchAdapter(
                     Log.d(TAG, "Media boundary reached: isLeft=$isLeft, currentIndex=$currentMediaIndex, totalMedia=${currentMediaItems.size}, myPosition=$myPosition, currentAdapterPosition=$currentAdapterPosition")
 
                     // 只有在没有被防抖且是当前活动ViewHolder时才处理
-                    if (currentTime - lastCompletionTime >= 500 && myPosition == currentAdapterPosition) {
+                    if (currentTime - lastCompletionTime >= NestedPagerConfig.DEBOUNCE_TIME_MS && myPosition == currentAdapterPosition) {
                         // 媒体滑动到边界时的处理
                         if (!isLeft && currentMediaIndex == currentMediaItems.size - 1) {
                             // 向左滑动到最后一个媒体，切换到下一个子tab
@@ -264,7 +275,7 @@ class SubTabSwitchAdapter(
                         }
                         // 注意：媒体内容边界只处理子tab切换，父tab切换由子tab边界处理
                     } else {
-                        if (currentTime - lastCompletionTime < 500) {
+                        if (currentTime - lastCompletionTime < NestedPagerConfig.DEBOUNCE_TIME_MS) {
                             Log.d(TAG, "Debouncing: ignoring boundary event (too soon after last completion)")
                         } else {
                             Log.d(TAG, "Boundary reached from non-active ViewHolder (myPosition=$myPosition, currentAdapterPosition=$currentAdapterPosition), ignoring")
